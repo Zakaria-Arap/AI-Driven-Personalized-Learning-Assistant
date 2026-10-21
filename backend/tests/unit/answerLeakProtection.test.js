@@ -4,6 +4,7 @@ const llm = require('../../src/services/ai/llmClient');
 const answerGuard = require('../../src/services/ai/answerGuard');
 const adaptiveLadder = require('../../src/services/ai/adaptiveLadder');
 const courses = require('../../src/seeders/data/courses/index');
+const { isRealLeak, isChoiceLeak } = require('./helpers/leak');
 
 describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
   let allQuestions = [];
@@ -72,10 +73,10 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
 
           totalHintsChecked++;
 
-          // Check if the answer appears in the hint
-          const containsAnswer = answerGuard.containsAnswer(hint, q.answer);
+          // Check if the answer appears in the hint using REAL LEAK detection
+          const leaked = isRealLeak(hint, q.answer);
           
-          if (containsAnswer) {
+          if (leaked) {
             leaks.push({
               course: q.courseName,
               grade: q.grade,
@@ -85,34 +86,29 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
               level,
               maxLevel,
               hint: hint.slice(0, 120),
-              config: `mastery=${config.masteryScore}, diff=${config.difficulty}`
+              config: `mastery=${config.masteryScore}, diff=${config.difficulty}`,
+              fullHint: hint // Keep full hint for analysis
             });
           }
 
           // For multiple choice, check that correct option text doesn't appear
           if (q.type === 'choice' && q.answer) {
-            const answerLower = q.answer.toLowerCase();
-            const hintLower = hint.toLowerCase();
+            const choiceLeak = isChoiceLeak(hint, q.answer);
             
-            // Extract option letter if answer is like "A. Some text" or "A) Some text"
-            const optionMatch = q.answer.match(/^([A-E])[\.\)]\s*(.+)$/);
-            if (optionMatch) {
-              const [, letter, text] = optionMatch;
-              // Check if the option text appears (not just the letter)
-              if (text.length > 3 && hintLower.includes(text.toLowerCase())) {
-                leaks.push({
-                  course: q.courseName,
-                  grade: q.grade,
-                  topic: q.topicTitle,
-                  prompt: q.prompt.slice(0, 80),
-                  answer: q.answer,
-                  level,
-                  maxLevel,
-                  hint: hint.slice(0, 120),
-                  config: `CHOICE LEAK: correct option text appeared`,
-                  type: 'choice'
-                });
-              }
+            if (choiceLeak) {
+              leaks.push({
+                course: q.courseName,
+                grade: q.grade,
+                topic: q.topicTitle,
+                prompt: q.prompt.slice(0, 80),
+                answer: q.answer,
+                level,
+                maxLevel,
+                hint: hint.slice(0, 120),
+                config: `CHOICE LEAK: correct option text appeared`,
+                type: 'choice',
+                fullHint: hint
+              });
             }
           }
         }

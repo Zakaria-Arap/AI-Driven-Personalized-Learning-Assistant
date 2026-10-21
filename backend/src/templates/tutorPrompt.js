@@ -51,10 +51,17 @@ module.exports = ({ topicTitle, topicOutcome, subjectName = 'Core Mathematics', 
   
   // CRITICAL SAFETY: Answer and solution enter the prompt ONLY at the final level
   // Below the final level, the prompt contains NO answer or solution (answerGuard is the safety net)
-  if (level >= maxLevel && adaptiveLadder.mayRevealAnswer(maxLevel)) {
+  // At the final level for THIS session (which may be 2-5), we may reveal the answer
+  if (level >= maxLevel && level >= adaptiveLadder.MAX_LEVEL) {
+    // Only at absolute level 5 do we reveal the full answer
     if (question.solution) {
       parts.push(`Teacher-reviewed solution you may now explain:\n${question.solution}`);
       parts.push(`The correct answer is: ${question.answer}`);
+    }
+  } else if (level === maxLevel && maxLevel < adaptiveLadder.MAX_LEVEL) {
+    // At early final levels (2, 3, 4), do NOT reveal answer - just the solution for context
+    if (question.solution) {
+      parts.push(`Reference solution (do NOT simply repeat this - use it to guide a worked example with DIFFERENT numbers):\n${question.solution}`);
     }
   }
   

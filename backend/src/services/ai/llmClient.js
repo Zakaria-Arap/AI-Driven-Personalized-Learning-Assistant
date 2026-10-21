@@ -20,11 +20,21 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
   // Extract what is being asked for
   const askMatch = prompt.match(/find|calculate|determine|solve for|what is|evaluate|work out/i);
   const whatAskedMatch = prompt.match(/(?:find|calculate|determine|what is|evaluate|work out)\s+(?:the\s+)?(\w+(?:\s+\w+){0,3})/i);
-  const whatAsked = whatAskedMatch ? whatAskedMatch[1] : 'the answer';
+  let whatAsked = whatAskedMatch ? whatAskedMatch[1] : 'the answer';
+  
+  // Safety check: don't use whatAsked if it contains the answer
+  if (whatAsked.toLowerCase().includes(answer.toLowerCase()) || answer.toLowerCase().includes(whatAsked.toLowerCase())) {
+    whatAsked = 'the answer';
+  }
   
   // Get concept from topic title (main noun/concept)
   const conceptWords = (topicTitle || '').split(/\s+/).filter(w => w.length > 3);
-  const concept = conceptWords[0] || 'this topic';
+  let concept = conceptWords[0] || 'this topic';
+  
+  // Safety check: don't use concept if it matches the answer (e.g., topic="Democracy", answer="democracy")
+  if (concept.toLowerCase() === answer.toLowerCase()) {
+    concept = 'this topic'; // Use generic term instead
+  }
   
   // Build question-specific hints
   switch (level) {
@@ -49,7 +59,7 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
       if (isKiswahili) {
         return `${givenText} Una kupata nini${uniqueUnits.length ? ` (kitengo: ${uniqueUnits[0]})` : ''}? Andika unachojua na unachotaka kupata.`;
       }
-      return `${givenText} What are you being asked to find about ${whatAsked}?${unitHint} Write down what you know and what you need.`;
+      return `${givenText} What are you being asked to find about ${whatAsked}?${unitHint} Write down what you know and what is required.`;
     }
       
     case 2: {
@@ -94,33 +104,52 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
       
       // For numeric, or if we cannot eliminate an option safely, use first solution step
       if (sol.length > 0) {
-        const firstLine = sol[0];
-        const answerLower = answer.toLowerCase();
-        const lineLower = firstLine.toLowerCase();
+        // Try each solution line until we find one that doesn't contain the answer
+        let safeLine = null;
         
-        // Text match
-        let containsAnswer = lineLower.includes(answerLower);
-        
-        // For choice questions, check if any part of the answer appears
-        if (question.type === 'choice') {
-          const optionText = answer.replace(/^[A-E][\.\)]\s*/, '');
-          containsAnswer = optionText.length > 3 && lineLower.includes(optionText.toLowerCase());
-        }
-        
-        // Check numeric equivalents (e.g., 0.5 vs 1/2)
-        if (!containsAnswer && question.type === 'numeric') {
-          const { toNumber } = require('../assessment/marking');
-          const answerNum = toNumber(answer);
-          if (!Number.isNaN(answerNum)) {
-            // Extract all fractions and decimals from the line
-            const possibleNums = firstLine.match(/\d+(?:\.\d+)?(?:\s*\/\s*\d+)?/g) || [];
-            containsAnswer = possibleNums.some(n => Math.abs(toNumber(n) - answerNum) < 0.001);
+        for (const line of sol) {
+          const answerLower = answer.toLowerCase();
+          const lineLower = line.toLowerCase();
+          
+          // Text match with word boundaries
+          const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const wordBoundaryPattern = new RegExp(`\\b${escapeRe(answerLower)}\\b`, 'i');
+          let containsAnswer = wordBoundaryPattern.test(line);
+          
+          // For choice questions, check if any part of the answer appears
+          if (!containsAnswer && question.type === 'choice') {
+            const optionText = answer.replace(/^[A-E][\.\)]\s*/, '');
+            if (optionText.length > 3) {
+              const optionPattern = new RegExp(`\\b${escapeRe(optionText.toLowerCase())}\\b`, 'i');
+              containsAnswer = optionPattern.test(line);
+            }
+          }
+          
+          // Check numeric equivalents (e.g., 0.5 vs 1/2)
+          if (!containsAnswer) {
+            const { toNumber } = require('../assessment/marking');
+            const answerNum = toNumber(answer);
+            if (!Number.isNaN(answerNum)) {
+              // Extract all fractions and decimals from the line
+              const possibleNums = line.match(/-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?/g) || [];
+              containsAnswer = possibleNums.some(n => {
+                const numValue = toNumber(n);
+                return Math.abs(numValue - answerNum) < 0.001;
+              });
+            }
+          }
+          
+          // If this line doesn't contain the answer, use it
+          if (!containsAnswer) {
+            safeLine = line;
+            break;
           }
         }
         
-        if (!containsAnswer) {
-          if (isKiswahili) return `Hatua ya kwanza: ${firstLine.slice(0, 70)}... Jaribu kuendelea.`;
-          return `The first step is: ${firstLine.slice(0, 90)}${firstLine.length > 90 ? '...' : ''}. What comes next?`;
+        // If we found a safe line, use it
+        if (safeLine) {
+          if (isKiswahili) return `Hatua ya kwanza: ${safeLine.slice(0, 70)}${safeLine.length > 70 ? '...' : ''}. Jaribu kuendelea.`;
+          return `The first step is: ${safeLine.slice(0, 90)}${safeLine.length > 90 ? '...' : ''}. What comes next?`;
         }
       }
       

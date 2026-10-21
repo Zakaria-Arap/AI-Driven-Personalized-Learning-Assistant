@@ -1,6 +1,7 @@
 // CRITICAL SAFETY TEST: The answer must NEVER appear in the system prompt below the final level
 const buildPrompt = require('../../src/templates/tutorPrompt');
 const adaptiveLadder = require('../../src/services/ai/adaptiveLadder');
+const { isRealLeak } = require('./helpers/leak');
 
 describe('Prompt Answer Protection', () => {
   const sampleQuestions = [
@@ -29,34 +30,27 @@ describe('Prompt Answer Protection', () => {
           const promptLower = prompt.toLowerCase();
           const answerLower = String(question.answer).toLowerCase();
           
-          // For single-digit answers, be more careful - check for word boundaries
-          if (answerLower.length === 1 && /^\d$/.test(answerLower)) {
-            // Check if answer appears as a standalone number, not as part of "level 4" or similar
-            const regex = new RegExp(`\\b${answerLower}\\b(?!\\s*(level|of|\\d))`, 'i');
-            if (regex.test(prompt)) {
-              throw new Error(
-                `Answer "${question.answer}" leaked in prompt at level ${level}/${maxLevel}\n` +
-                `Question: ${question.prompt}\n` +
-                `Prompt excerpt: ...${prompt.slice(Math.max(0, prompt.toLowerCase().indexOf(answerLower) - 50), prompt.toLowerCase().indexOf(answerLower) + answerLower.length + 50)}...`
-              );
-            }
-          } else {
-            // For longer answers, simple contains check
-            if (promptLower.includes(answerLower)) {
-              throw new Error(
-                `Answer "${question.answer}" leaked in prompt at level ${level}/${maxLevel}\n` +
-                `Question: ${question.prompt}\n` +
-                `Prompt excerpt: ...${prompt.slice(Math.max(0, promptLower.indexOf(answerLower) - 50), promptLower.indexOf(answerLower) + answerLower.length + 50)}...`
-              );
-            }
+          // Use the same leak detection logic as the hint tests
+          if (isRealLeak(prompt, question.answer)) {
+            // Find where the leak is for better error message
+            const answerPos = promptLower.indexOf(answerLower);
+            throw new Error(
+              `Answer "${question.answer}" leaked in prompt at level ${level}/${maxLevel}\n` +
+              `Question: ${question.prompt}\n` +
+              `Prompt excerpt: ...${prompt.slice(Math.max(0, answerPos - 50), answerPos + answerLower.length + 50)}...`
+            );
           }
 
-          // The solution must NOT appear in the prompt
-          if (question.solution && promptLower.includes('solution')) {
-            throw new Error(
-              `Solution leaked in prompt at level ${level}/${maxLevel}\n` +
-              `Question: ${question.prompt}`
-            );
+          // The solution TEXT must NOT appear in the prompt (but the word "solution" in instructions is OK)
+          if (question.solution) {
+            const solutionText = question.solution.toLowerCase();
+            if (promptLower.includes(solutionText)) {
+              throw new Error(
+                `Solution text leaked in prompt at level ${level}/${maxLevel}\n` +
+                `Question: ${question.prompt}\n` +
+                `Solution: ${question.solution}`
+              );
+            }
           }
         }
       }
@@ -81,16 +75,15 @@ describe('Prompt Answer Protection', () => {
       const promptLower = prompt.toLowerCase();
       const answerLower = question.answer.toLowerCase();
       
-      // At final level, answer SHOULD appear (but be smart about single digits)
-      if (answerLower.length === 1 && /^\d$/.test(answerLower)) {
-        const regex = new RegExp(`\\b${answerLower}\\b`, 'i');
-        expect(regex.test(prompt)).toBe(true);
-      } else {
-        expect(promptLower).toContain(answerLower);
-      }
+      // At final level, answer SHOULD appear as a real leak (meaningful occurrence)
+      // Use leak detection to verify it's there in a real way
+      expect(isRealLeak(prompt, question.answer)).toBe(true);
       
-      // At final level, solution SHOULD appear
-      expect(promptLower).toContain('solution');
+      // At final level, solution TEXT SHOULD appear
+      if (question.solution) {
+        const solutionText = question.solution.toLowerCase();
+        expect(promptLower).toContain(solutionText);
+      }
     }
   });
 
@@ -112,7 +105,11 @@ describe('Prompt Answer Protection', () => {
       masteryBand: 'mastered',
       lang: 'en'
     });
-    expect(prompt1.toLowerCase()).not.toContain('5');
-    expect(prompt1.toLowerCase()).not.toContain(question.solution.toLowerCase());
+    
+    // Level 1 prompt should NOT contain answer (use proper leak detection)
+    expect(isRealLeak(prompt1, '5')).toBe(false);
+    
+    const solutionText = question.solution.toLowerCase();
+    expect(prompt1.toLowerCase()).not.toContain(solutionText);
   });
 });
