@@ -34,7 +34,7 @@ describe('Prompt Answer Protection', () => {
       });
     });
 
-    console.log(`\n📚 Loaded ${allQuestions.length} questions for prompt protection test`);
+    console.log(`\n📚 Loaded ${allQuestions.length} questions\n`);
   });
 
   test('answer and solution NEVER appear in prompt below final level - ALL 408 QUESTIONS', () => {
@@ -117,10 +117,7 @@ describe('Prompt Answer Protection', () => {
       }
     }
 
-    console.log(`\n✅ Checked ${totalPromptsChecked} prompts across ${allQuestions.length} questions`);
-    console.log(`   Formula: ${allQuestions.length} questions × (1+2+3+4 non-final levels) = ${allQuestions.length} × 10 = ${allQuestions.length * 10} prompts`);
-    console.log(`   Ladder lengths: 2, 3, 4, 5`);
-    console.log(`   Levels per ladder: 1 to (maxLevel-1)\n`);
+    console.log(`\n✅ Checked ${totalPromptsChecked} prompts (${allQuestions.length} questions × 10 non-final levels)\n`);
 
     if (leaks.length > 0) {
       console.error(`\n❌ ${leaks.length} PROMPT LEAKS DETECTED:\n`);

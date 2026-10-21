@@ -109,11 +109,7 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
 
     console.log(`\n✅ Checked ${totalHintsChecked} hints across ${allQuestions.length} questions`);
     console.log(`   Formula: ${allQuestions.length} questions × (1+2+3+4 non-final levels) = ${allQuestions.length} × 10 = ${allQuestions.length * 10} total hints`);
-    console.log(`   Actual count: ${totalHintsChecked} hints`);
-    console.log(`   Ladder lengths: 2, 3, 4, 5`);
-    console.log(`   Levels per ladder: 1 to (maxLevel-1)\n`);
-    console.log(`   Previous count was 3,264 = 408 × 8 because it tested only 3 learner profiles`);
-    console.log(`   (strong/struggling/medium) instead of all ladder lengths\n`);
+    console.log(`   Previous count was 3,264 = 408 × 8 (tested 3 learner profiles)\n`);
 
     if (leaks.length > 0) {
       console.error(`\n❌ ${leaks.length} ANSWER LEAKS DETECTED:\n`);
