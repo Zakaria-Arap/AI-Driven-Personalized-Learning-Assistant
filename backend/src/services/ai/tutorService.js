@@ -98,6 +98,13 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
     // Attempts not available, continue without
   }
 
+  // Calculate adaptive maxLevel based on learner strength and question difficulty
+  const maxLevel = adaptiveLadder.levelsFor({ 
+    difficulty: q.difficulty || 3, 
+    masteryScore, 
+    priorMistakesOnTopic: priorErrors.length 
+  });
+
   const lang = learner.language || 'en';
 
   const history = messages;
@@ -107,7 +114,7 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
     subjectName, 
     question: q, 
     level,
-    maxLevel: hintLadder.MAX_LEVEL,
+    maxLevel,
     masteryScore,
     masteryBand,
     latestAttempt,
@@ -119,7 +126,7 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
     system, 
     history, 
     level, 
-    maxLevel: hintLadder.MAX_LEVEL,
+    maxLevel,
     question: q,
     topicTitle: topic.title,
     masteryBand,
@@ -127,14 +134,14 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
     lang
   });
 
-  const guarded = answerGuard.check({ reply: raw, answer: q.answer, level, fallback: fallbackHint(level) });
+  const guarded = answerGuard.check({ reply: raw, answer: q.answer, level, maxLevel, fallback: fallbackHint(level) });
   if (guarded.blocked) {
     session.flagReason = 'answer_filter_triggered';
     await audit.record('ANSWER_FILTER', { actorId: learnerId, targetType: 'tutor_session', targetId: session.id, meta: { level } });
   }
   await tutorRepo.saveSession(session);
   await tutorRepo.addMessage({ sessionId, role: 'tutor', content: guarded.reply, hintLevel: level, blocked: guarded.blocked });
-  return { reply: guarded.reply, level, maxLevel: hintLadder.MAX_LEVEL, flagged: false };
+  return { reply: guarded.reply, level, maxLevel, flagged: false };
 };
 
 exports.transcript = async (requester, sessionId) => {

@@ -19,10 +19,12 @@ function containsAnswer(reply, answer) {
 
 /**
  * Returns { ok, reply, blocked }.
- * Below the full-solution level, a reply that contains the answer is replaced by a safe fallback.
+ * Below the session's final level, a reply that contains the answer is replaced by a safe fallback.
+ * @param {number} level - Current hint level
+ * @param {number} maxLevel - Session's maximum level (from adaptiveLadder)
  */
-exports.check = ({ reply, answer, level, fallback }) => {
-  if (level >= 5) return { ok: true, reply, blocked: false };
+exports.check = ({ reply, answer, level, maxLevel, fallback }) => {
+  if (level >= maxLevel) return { ok: true, reply, blocked: false };
   if (containsAnswer(reply, answer)) return { ok: false, reply: fallback, blocked: true };
   return { ok: true, reply, blocked: false };
 };

@@ -49,19 +49,14 @@ module.exports = ({ topicTitle, topicOutcome, subjectName = 'Core Mathematics', 
       : 'Reply in at most 120 words. Mention the actual numbers, concepts or steps from THIS question.',
   );
   
-  // CRITICAL SAFETY: Answer and solution enter the prompt ONLY at the final level
+  // CRITICAL SAFETY: Answer and solution enter the prompt ONLY at the final level of THIS session
+  // Final level means level === maxLevel (the adaptive ladder's chosen max for this learner)
   // Below the final level, the prompt contains NO answer or solution (answerGuard is the safety net)
-  // At the final level for THIS session (which may be 2-5), we may reveal the answer
-  if (level >= maxLevel && level >= adaptiveLadder.MAX_LEVEL) {
-    // Only at absolute level 5 do we reveal the full answer
+  if (level >= maxLevel) {
+    // At the session's final level (2, 3, 4, or 5), reveal the full solution and answer
     if (question.solution) {
       parts.push(`Teacher-reviewed solution you may now explain:\n${question.solution}`);
       parts.push(`The correct answer is: ${question.answer}`);
-    }
-  } else if (level === maxLevel && maxLevel < adaptiveLadder.MAX_LEVEL) {
-    // At early final levels (2, 3, 4), do NOT reveal answer - just the solution for context
-    if (question.solution) {
-      parts.push(`Reference solution (do NOT simply repeat this - use it to guide a worked example with DIFFERENT numbers):\n${question.solution}`);
     }
   }
   

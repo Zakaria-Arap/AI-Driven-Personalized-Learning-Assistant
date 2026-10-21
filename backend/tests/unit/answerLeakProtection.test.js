@@ -49,16 +49,8 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
     const leaks = [];
 
     for (const q of allQuestions) {
-      // Test with different adaptive ladder configurations
-      const configs = [
-        { difficulty: q.difficulty, masteryScore: 80, priorMistakesOnTopic: 0 }, // Strong learner
-        { difficulty: q.difficulty, masteryScore: 40, priorMistakesOnTopic: 5 }, // Struggling learner
-        { difficulty: q.difficulty, masteryScore: 60, priorMistakesOnTopic: 1 }, // Medium learner
-      ];
-
-      for (const config of configs) {
-        const maxLevel = adaptiveLadder.levelsFor(config);
-        
+      // Test EVERY ladder length (2, 3, 4, 5) for EVERY question
+      for (let maxLevel = 2; maxLevel <= 5; maxLevel++) {
         // Test EVERY level below the final
         for (let level = 1; level < maxLevel; level++) {
           const hint = await llm.complete({
@@ -66,7 +58,7 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
             maxLevel,
             question: { id: 1, prompt: q.prompt, answer: q.answer, solution: q.solution, type: q.type },
             topicTitle: q.topicTitle,
-            masteryBand: config.masteryScore >= 80 ? 'mastered' : 'learning',
+            masteryBand: 'learning',
             latestAttempt: null,
             lang: 'en'
           });
@@ -86,7 +78,7 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
               level,
               maxLevel,
               hint: hint.slice(0, 120),
-              config: `mastery=${config.masteryScore}, diff=${config.difficulty}`,
+              config: `maxLevel=${maxLevel}`,
               fullHint: hint // Keep full hint for analysis
             });
           }
@@ -116,8 +108,12 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
     }
 
     console.log(`\n✅ Checked ${totalHintsChecked} hints across ${allQuestions.length} questions`);
-    console.log(`   Configurations: strong learner, struggling learner, medium learner`);
-    console.log(`   Levels tested: 1 to (maxLevel-1) for each configuration\n`);
+    console.log(`   Formula: ${allQuestions.length} questions × (1+2+3+4 non-final levels) = ${allQuestions.length} × 10 = ${allQuestions.length * 10} total hints`);
+    console.log(`   Actual count: ${totalHintsChecked} hints`);
+    console.log(`   Ladder lengths: 2, 3, 4, 5`);
+    console.log(`   Levels per ladder: 1 to (maxLevel-1)\n`);
+    console.log(`   Previous count was 3,264 = 408 × 8 because it tested only 3 learner profiles`);
+    console.log(`   (strong/struggling/medium) instead of all ladder lengths\n`);
 
     if (leaks.length > 0) {
       console.error(`\n❌ ${leaks.length} ANSWER LEAKS DETECTED:\n`);
@@ -139,28 +135,32 @@ describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
 
   test('answer guard blocks answer at all levels below final', () => {
     const testCases = [
-      { answer: '42', level: 1, reply: 'The answer is 42' },
-      { answer: '100', level: 2, reply: 'You should get 100' },
-      { answer: '0.5', level: 3, reply: 'The result is 0.5 or 1/2' },
-      { answer: '-10', level: 4, reply: 'Final value: -10' },
+      { answer: '42', level: 1, maxLevel: 5, reply: 'The answer is 42' },
+      { answer: '100', level: 2, maxLevel: 5, reply: 'You should get 100' },
+      { answer: '0.5', level: 3, maxLevel: 4, reply: 'The result is 0.5 or 1/2' },
+      { answer: '-10', level: 2, maxLevel: 3, reply: 'Final value: -10' },
     ];
 
-    testCases.forEach(({ answer, level, reply }) => {
-      const result = answerGuard.check({ reply, answer, level, fallback: 'blocked' });
+    testCases.forEach(({ answer, level, maxLevel, reply }) => {
+      const result = answerGuard.check({ reply, answer, level, maxLevel, fallback: 'blocked' });
       expect(result.blocked).toBe(true);
       expect(result.reply).toBe('blocked');
     });
   });
 
-  test('answer guard allows answer at level 5', () => {
-    const result = answerGuard.check({
-      reply: 'The final answer is 42',
-      answer: '42',
-      level: 5,
-      fallback: 'blocked'
+  test('answer guard allows answer at final level', () => {
+    const testCases = [
+      { answer: '42', level: 5, maxLevel: 5, reply: 'The final answer is 42' },
+      { answer: '100', level: 3, maxLevel: 3, reply: 'The answer is 100' },
+      { answer: '7', level: 2, maxLevel: 2, reply: 'The result is 7' },
+    ];
+
+    testCases.forEach(({ answer, level, maxLevel, reply }) => {
+      const result = answerGuard.check({ reply, answer, level, maxLevel, fallback: 'blocked' });
+      expect(result.ok).toBe(true);
+      expect(result.blocked).toBe(false);
+      expect(result.reply).toBe(reply);
     });
-    expect(result.blocked).toBe(false);
-    expect(result.reply).toContain('42');
   });
 
   test('sufficient question coverage across subjects', () => {
