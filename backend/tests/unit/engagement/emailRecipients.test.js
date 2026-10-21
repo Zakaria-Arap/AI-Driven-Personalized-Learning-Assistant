@@ -1,4 +1,4 @@
-const { selectEmailRecipients } = require('../../src/services/engagement/emailRecipients');
+const { selectEmailRecipients } = require('../../../src/services/engagement/emailRecipients');
 
 describe('selectEmailRecipients', () => {
   const users = [
@@ -62,3 +62,33 @@ describe('selectEmailRecipients', () => {
     expect(dupes.length).toBe(1);
   });
 });
+
+  test('parity: audience targets match announcementService roles', () => {
+    const roleMap = {
+      all: ['admin', 'tutor', 'learner', 'parent'],
+      tutors: ['tutor'],
+      learners: ['learner'],
+      parents: ['parent'],
+    };
+    expect(roleMap.tutors).toEqual(['tutor']);
+    expect(roleMap.learners).toEqual(['learner']);
+    expect(roleMap.parents).toEqual(['parent']);
+  });
+
+  test('user without announcementEmail pref is included', () => {
+    const users = [
+      { id: 1, role: 'learner', email: 'test@example.com', status: 'active', prefs: {} },
+    ];
+    const result = selectEmailRecipients({ audience: 'all', authorId: 999, users });
+    expect(result.length).toBe(1);
+  });
+
+  test('user with announcementEmail=false is excluded', () => {
+    const users = [
+      { id: 1, role: 'learner', email: 'opted-out@example.com', status: 'active', prefs: { notify: { announcementEmail: false } } },
+      { id: 2, role: 'learner', email: 'opted-in@example.com', status: 'active', prefs: { notify: { announcementEmail: true } } },
+    ];
+    const result = selectEmailRecipients({ audience: 'all', authorId: 999, users });
+    expect(result.find(u => u.id === 1)).toBeUndefined();
+    expect(result.find(u => u.id === 2)).toBeDefined();
+  });
