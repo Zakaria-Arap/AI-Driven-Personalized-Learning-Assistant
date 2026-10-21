@@ -13,26 +13,86 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
   const allNumbers = prompt.match(/\d+(?:\.\d+)?/g) || [];
   const safeNumbers = allNumbers.filter(n => n !== answer && !answer.includes(n));
   
-  // Extract key term
-  const keyTermMatch = prompt.match(/(?:find|calculate|determine|solve for|what is)\s+(?:the\s+)?(\w+(?:\s+\w+)?)/i);
-  const keyTerm = keyTermMatch ? keyTermMatch[1] : 'the value';
+  // Extract units (cm, km, hours, degrees, etc.)
+  const units = prompt.match(/\b(cm|km|m|kg|g|hours?|minutes?|seconds?|degrees?|°|liters?|KES|%|years?)\b/gi) || [];
+  const uniqueUnits = [...new Set(units.map(u => u.toLowerCase()))];
   
-  // Get concept from topic title
-  const conceptWords = (topicTitle || '').split(/\s+/).filter(w => w.length > 4);
-  const concept = conceptWords[0] || 'this';
+  // Extract what is being asked for
+  const askMatch = prompt.match(/find|calculate|determine|solve for|what is|evaluate|work out/i);
+  const whatAskedMatch = prompt.match(/(?:find|calculate|determine|what is|evaluate|work out)\s+(?:the\s+)?(\w+(?:\s+\w+){0,3})/i);
+  const whatAsked = whatAskedMatch ? whatAskedMatch[1] : 'the answer';
   
-  // Build safe hints
+  // Get concept from topic title (main noun/concept)
+  const conceptWords = (topicTitle || '').split(/\s+/).filter(w => w.length > 3);
+  const concept = conceptWords[0] || 'this topic';
+  
+  // Build question-specific hints
   switch (level) {
-    case 1:
-      if (isKiswahili) return `Swali linauliza nini? Andika unachojua na unachotaka kupata.`;
-      return `What is the question asking you to find? Write down what you know from the problem and what you need to find.`;
+    case 1: {
+      // MUST name what is given and what is asked, using actual quantities/units
+      const givenParts = [];
+      if (safeNumbers.length > 0) {
+        givenParts.push(`${safeNumbers.slice(0, 3).join(', ')}`);
+      }
+      if (uniqueUnits.length > 0) {
+        givenParts.push(`in ${uniqueUnits.slice(0, 2).join(' and ')}`);
+      }
       
-    case 2:
-      if (isKiswahili) return `Fikiria sheria au fomula inayohusiana na ${concept}. Inasema nini kwa ujumla?`;
-      return `Think about the ${concept} concept. Which rule or formula applies to this type of problem? Write the general formula first.`;
+      const givenText = givenParts.length > 0 
+        ? `You are given: ${givenParts.join(' ')}.` 
+        : 'Look at the information given in the problem.';
       
-    case 3:
-      // Only use solution line if it does NOT contain the answer (check both text and numeric equivalents)
+      const unitHint = uniqueUnits.length > 0 
+        ? ` In what unit should your answer be?` 
+        : '';
+      
+      if (isKiswahili) {
+        return `${givenText} Una kupata nini${uniqueUnits.length ? ` (kitengo: ${uniqueUnits[0]})` : ''}? Andika unachojua na unachotaka kupata.`;
+      }
+      return `${givenText} What are you being asked to find about ${whatAsked}?${unitHint} Write down what you know and what you need.`;
+    }
+      
+    case 2: {
+      // MUST name the concept from topic and ask learner to recall its rule
+      const formulaHint = question.type === 'numeric' && (
+        prompt.toLowerCase().includes('area') || 
+        prompt.toLowerCase().includes('speed') ||
+        prompt.toLowerCase().includes('interest') ||
+        prompt.toLowerCase().includes('volume')
+      );
+      
+      if (isKiswahili) {
+        return `Dhana hii inahusiana na ${concept}. Je, una kumbuka sheria au fomula ya ${concept}? Iandike kwa maneno au alama za hisabati.`;
+      }
+      
+      if (formulaHint) {
+        return `This problem is about ${concept}. What is the ${concept} formula? Write it down before substituting any numbers.`;
+      }
+      return `Think about ${concept}. What rule or principle from ${concept} connects the information in this problem? State it in your own words.`;
+    }
+      
+    case 3: {
+      // For multiple choice: may eliminate ONE wrong option only if ladder has >= 4 levels
+      if (question.type === 'choice' && maxLevel >= 4) {
+        // Extract options from the prompt
+        const optionMatches = prompt.match(/[A-E][\.\)]\s+[^\n]+/g);
+        if (optionMatches && optionMatches.length >= 3) {
+          // Find which option is correct
+          const correctOptionMatch = answer.match(/^([A-E])[\.\)]/);
+          if (correctOptionMatch) {
+            const correctLetter = correctOptionMatch[1];
+            // Pick a wrong option to eliminate (not the correct one)
+            const wrongOptions = optionMatches.filter(opt => !opt.startsWith(correctLetter));
+            if (wrongOptions.length > 0) {
+              const eliminateOption = wrongOptions[0].match(/^([A-E])/)[1];
+              if (isKiswahili) return `Chaguo ${eliminateOption} sio sahihi. Fikiria kuhusu chaguo zilizosalia. Ni ipi inakubaliana zaidi na dhana ya ${concept}?`;
+              return `You can eliminate option ${eliminateOption} - it is not correct. Think about the remaining options. Which one best matches the ${concept} concept?`;
+            }
+          }
+        }
+      }
+      
+      // For numeric, or if we cannot eliminate an option safely, use first solution step
       if (sol.length > 0) {
         const firstLine = sol[0];
         const answerLower = answer.toLowerCase();
@@ -40,6 +100,12 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
         
         // Text match
         let containsAnswer = lineLower.includes(answerLower);
+        
+        // For choice questions, check if any part of the answer appears
+        if (question.type === 'choice') {
+          const optionText = answer.replace(/^[A-E][\.\)]\s*/, '');
+          containsAnswer = optionText.length > 3 && lineLower.includes(optionText.toLowerCase());
+        }
         
         // Check numeric equivalents (e.g., 0.5 vs 1/2)
         if (!containsAnswer && question.type === 'numeric') {
@@ -57,8 +123,16 @@ async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand
           return `The first step is: ${firstLine.slice(0, 90)}${firstLine.length > 90 ? '...' : ''}. What comes next?`;
         }
       }
-      if (isKiswahili) return 'Andika fomula unayohitaji, kisha weka namba kutoka kwa swali kwa hatua ya kwanza tu.';
+      
+      // Fallback for choice questions
+      if (question.type === 'choice') {
+        if (isKiswahili) return `Fikiria kila chaguo kwa makini. Ni lipi linafaa zaidi na dhana ya ${concept}?`;
+        return `Think through each option carefully. Which one best fits with what you know about ${concept}?`;
+      }
+      
+      if (isKiswahili) return 'Andika fomula unayohitaji, kisha weka namba kutoka kwa swali kwa hatua ya kwanza tu. Nionyeshe hesabu hiyo.';
       return `Write down the formula, then substitute the values from the question for the first step. Show me that calculation.`;
+    }
       
     case 4: {
       // Worked example with DIFFERENT numbers - NEVER use the answer

@@ -45,17 +45,17 @@ module.exports = ({ topicTitle, topicOutcome, subjectName = 'Core Mathematics', 
     `Current hint level: ${step.level} of ${maxLevel} (${step.name}).`,
     `What to do at this level: ${step.instruction}`,
     isKiswahili
-      ? 'Jibu kwa maneno 120 au chini. Usitoe jibu la mwisho isipokuwa ungamo wa mwisho.'
+      ? 'Jibu kwa maneno 120 au chini.'
       : 'Reply in at most 120 words. Mention the actual numbers, concepts or steps from THIS question.',
   );
   
-  // Answer protection: only reveal at final level
+  // CRITICAL SAFETY: Answer and solution enter the prompt ONLY at the final level
+  // Below the final level, the prompt contains NO answer or solution (answerGuard is the safety net)
   if (level >= maxLevel && adaptiveLadder.mayRevealAnswer(maxLevel)) {
     if (question.solution) {
       parts.push(`Teacher-reviewed solution you may now explain:\n${question.solution}`);
+      parts.push(`The correct answer is: ${question.answer}`);
     }
-  } else {
-    parts.push(`NEVER reveal the final answer (${question.answer}) until level ${maxLevel}.`);
   }
   
   parts.push(

@@ -1,77 +1,147 @@
-// Critical test: the answer must NEVER appear in hints before the final level
+// CRITICAL TEST: the answer must NEVER appear in hints before the final level
+// Tests against ALL 408+ seeded questions from the real curriculum data
 const llm = require('../../src/services/ai/llmClient');
 const answerGuard = require('../../src/services/ai/answerGuard');
-const { Question } = require('../../src/models');
+const adaptiveLadder = require('../../src/services/ai/adaptiveLadder');
+const courses = require('../../src/seeders/data/courses/index');
 
-describe('Answer Leak Protection', () => {
-  let questions = [];
+describe('Answer Leak Protection - ALL REAL QUESTIONS', () => {
+  let allQuestions = [];
 
-  beforeAll(async () => {
-    // Try to load seeded questions; if DB not available, use sample questions
-    try {
-      questions = await Question.findAll({ limit: 50 });
-      if (!questions.length) {
-        console.log('No seeded questions found, using samples');
-        questions = getSampleQuestions();
-      }
-    } catch (e) {
-      console.log('DB not available, using sample questions');
-      questions = getSampleQuestions();
+  beforeAll(() => {
+    // Load ALL questions from every course, every grade, every topic
+    courses.forEach(course => {
+      [10, 11, 12].forEach(grade => {
+        const strands = course.grades[grade] || [];
+        strands.forEach(strand => {
+          (strand.topics || []).forEach(topic => {
+            (topic.questions || []).forEach(q => {
+              allQuestions.push({
+                courseCode: course.code,
+                courseName: course.name,
+                grade,
+                strandTitle: strand.title,
+                topicSlug: topic.slug,
+                topicTitle: topic.title,
+                prompt: q.prompt,
+                answer: String(q.answer),
+                solution: q.solution || '',
+                type: q.type || 'numeric',
+                difficulty: q.difficulty || 3
+              });
+            });
+          });
+        });
+      });
+    });
+
+    console.log(`\n📚 Loaded ${allQuestions.length} questions from seeder data`);
+    
+    // MUST have at least 400 questions
+    if (allQuestions.length < 400) {
+      throw new Error(`INSUFFICIENT TEST DATA: Only ${allQuestions.length} questions loaded. Expected at least 400.`);
     }
   });
 
-  test('mock hints never contain the answer before the final level', async () => {
-    const maxLevel = 5;
-    let leakCount = 0;
+  test('mock hints never contain the answer before the final level - ALL REAL QUESTIONS', async () => {
+    let totalHintsChecked = 0;
     const leaks = [];
 
-    for (const q of questions) {
-      const questionData = {
-        id: q.id,
-        prompt: q.prompt,
-        answer: q.answer,
-        solution: q.solution,
-        type: q.type
-      };
+    for (const q of allQuestions) {
+      // Test with different adaptive ladder configurations
+      const configs = [
+        { difficulty: q.difficulty, masteryScore: 80, priorMistakesOnTopic: 0 }, // Strong learner
+        { difficulty: q.difficulty, masteryScore: 40, priorMistakesOnTopic: 5 }, // Struggling learner
+        { difficulty: q.difficulty, masteryScore: 60, priorMistakesOnTopic: 1 }, // Medium learner
+      ];
 
-      for (let level = 1; level < maxLevel; level++) {
-        const hint = await llm.complete({
-          level,
-          maxLevel,
-          question: questionData,
-          topicTitle: 'Test Topic',
-          masteryBand: 'learning',
-          latestAttempt: null,
-          lang: 'en'
-        });
-
-        // Check if the answer appears in the hint
-        const containsAnswer = answerGuard.containsAnswer(hint, q.answer);
+      for (const config of configs) {
+        const maxLevel = adaptiveLadder.levelsFor(config);
         
-        if (containsAnswer) {
-          leakCount++;
-          leaks.push({
-            questionId: q.id,
-            prompt: q.prompt.slice(0, 60),
-            answer: q.answer,
+        // Test EVERY level below the final
+        for (let level = 1; level < maxLevel; level++) {
+          const hint = await llm.complete({
             level,
-            hint: hint.slice(0, 100)
+            maxLevel,
+            question: { id: 1, prompt: q.prompt, answer: q.answer, solution: q.solution, type: q.type },
+            topicTitle: q.topicTitle,
+            masteryBand: config.masteryScore >= 80 ? 'mastered' : 'learning',
+            latestAttempt: null,
+            lang: 'en'
           });
+
+          totalHintsChecked++;
+
+          // Check if the answer appears in the hint
+          const containsAnswer = answerGuard.containsAnswer(hint, q.answer);
+          
+          if (containsAnswer) {
+            leaks.push({
+              course: q.courseName,
+              grade: q.grade,
+              topic: q.topicTitle,
+              prompt: q.prompt.slice(0, 80),
+              answer: q.answer,
+              level,
+              maxLevel,
+              hint: hint.slice(0, 120),
+              config: `mastery=${config.masteryScore}, diff=${config.difficulty}`
+            });
+          }
+
+          // For multiple choice, check that correct option text doesn't appear
+          if (q.type === 'choice' && q.answer) {
+            const answerLower = q.answer.toLowerCase();
+            const hintLower = hint.toLowerCase();
+            
+            // Extract option letter if answer is like "A. Some text" or "A) Some text"
+            const optionMatch = q.answer.match(/^([A-E])[\.\)]\s*(.+)$/);
+            if (optionMatch) {
+              const [, letter, text] = optionMatch;
+              // Check if the option text appears (not just the letter)
+              if (text.length > 3 && hintLower.includes(text.toLowerCase())) {
+                leaks.push({
+                  course: q.courseName,
+                  grade: q.grade,
+                  topic: q.topicTitle,
+                  prompt: q.prompt.slice(0, 80),
+                  answer: q.answer,
+                  level,
+                  maxLevel,
+                  hint: hint.slice(0, 120),
+                  config: `CHOICE LEAK: correct option text appeared`,
+                  type: 'choice'
+                });
+              }
+            }
+          }
         }
       }
     }
 
+    console.log(`\n✅ Checked ${totalHintsChecked} hints across ${allQuestions.length} questions`);
+    console.log(`   Configurations: strong learner, struggling learner, medium learner`);
+    console.log(`   Levels tested: 1 to (maxLevel-1) for each configuration\n`);
+
     if (leaks.length > 0) {
-      console.error('Answer leaks detected:');
-      leaks.forEach(leak => {
-        console.error(`Q${leak.questionId} (${leak.prompt}...) answer="${leak.answer}" leaked at level ${leak.level}: "${leak.hint}..."`);
+      console.error(`\n❌ ${leaks.length} ANSWER LEAKS DETECTED:\n`);
+      leaks.slice(0, 10).forEach((leak, i) => {
+        console.error(`${i + 1}. [${leak.course} G${leak.grade}] ${leak.topic}`);
+        console.error(`   Q: ${leak.prompt}...`);
+        console.error(`   Answer: "${leak.answer}"`);
+        console.error(`   Leaked at level ${leak.level}/${leak.maxLevel} (${leak.config})`);
+        console.error(`   Hint: "${leak.hint}..."`);
+        console.error('');
       });
+      if (leaks.length > 10) {
+        console.error(`   ... and ${leaks.length - 10} more leaks\n`);
+      }
     }
 
-    expect(leakCount).toBe(0);
+    expect(leaks.length).toBe(0);
   });
 
-  test('answer guard blocks answer at levels 1-4', () => {
+  test('answer guard blocks answer at all levels below final', () => {
     const testCases = [
       { answer: '42', level: 1, reply: 'The answer is 42' },
       { answer: '100', level: 2, reply: 'You should get 100' },
@@ -96,44 +166,22 @@ describe('Answer Leak Protection', () => {
     expect(result.blocked).toBe(false);
     expect(result.reply).toContain('42');
   });
-});
 
-function getSampleQuestions() {
-  return [
-    {
-      id: 1,
-      prompt: 'Calculate the area of a rectangle with length 12 cm and width 8 cm.',
-      answer: '96',
-      type: 'numeric',
-      solution: 'Area = length × width\nArea = 12 × 8\nArea = 96 cm²'
-    },
-    {
-      id: 2,
-      prompt: 'Solve for x: 2x + 5 = 17',
-      answer: '6',
-      type: 'numeric',
-      solution: '2x + 5 = 17\n2x = 17 - 5\n2x = 12\nx = 6'
-    },
-    {
-      id: 3,
-      prompt: 'What is 15% of 200?',
-      answer: '30',
-      type: 'numeric',
-      solution: '15% of 200 = (15/100) × 200\n= 0.15 × 200\n= 30'
-    },
-    {
-      id: 4,
-      prompt: 'If a car travels 180 km in 3 hours, what is its average speed in km/h?',
-      answer: '60',
-      type: 'numeric',
-      solution: 'Speed = Distance / Time\nSpeed = 180 / 3\nSpeed = 60 km/h'
-    },
-    {
-      id: 5,
-      prompt: 'What is the square root of 144?',
-      answer: '12',
-      type: 'numeric',
-      solution: '√144 = 12\nBecause 12 × 12 = 144'
-    }
-  ];
-}
+  test('sufficient question coverage across subjects', () => {
+    const byCourse = {};
+    allQuestions.forEach(q => {
+      byCourse[q.courseCode] = (byCourse[q.courseCode] || 0) + 1;
+    });
+
+    console.log('\n📊 Questions per course:');
+    Object.entries(byCourse).sort((a, b) => b[1] - a[1]).forEach(([code, count]) => {
+      console.log(`   ${code}: ${count}`);
+    });
+
+    // Ensure we have questions from core subjects
+    expect(byCourse['MATH']).toBeGreaterThan(0);
+    expect(byCourse['BIO']).toBeGreaterThan(0);
+    expect(byCourse['PHY']).toBeGreaterThan(0);
+    expect(byCourse['ENG']).toBeGreaterThan(0);
+  });
+});
