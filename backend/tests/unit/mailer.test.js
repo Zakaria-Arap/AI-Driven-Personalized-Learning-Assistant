@@ -91,55 +91,28 @@ describe('Mailer - sendAnnouncement', () => {
     spy.mockRestore();
   });
 
-  test('HTML escaping verification - real output', async () => {
+  test('announcement HTML is escaped', () => {
     const mailer = require('../../src/services/auth/mailer');
-    const logger = require('../../src/utils/logger');
-    
-    let loggedHtml = '';
-    const originalInfo = logger.info;
-    logger.info = jest.fn((msg) => {
-      loggedHtml = msg;
-    });
-    
-    const config = require('../../src/config');
-    const originalProvider = config.mail.provider;
-    config.mail.provider = 'log';
-    
-    await mailer.sendAnnouncement({
-      to: 'test@example.com',
-      name: 'Test',
+    const result = mailer._buildAnnouncementEmail({
+      name: 'A',
       title: '<b>Hi</b>',
-      body: '<script>alert(1)</script> & \'quotes\'',
-      senderName: 'Admin',
-      schoolName: 'School',
-      link: 'http://example.com'
+      body: "<script>alert(1)</script> & 'q'",
+      senderName: 'S',
+      schoolName: 'Demo School',
+      link: 'http://x/announcements'
     });
     
-    // Get the actual HTML by calling the internal function
-    const mailerModule = require('../../src/services/auth/mailer');
-    const escapeHtml = mailerModule._escapeHtml || ((str) => {
-      if (!str) return '';
-      return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    });
+    const { html, text } = result;
     
-    const escapedTitle = escapeHtml('<b>Hi</b>');
-    const escapedBody = escapeHtml('<script>alert(1)</script> & \'quotes\'');
-    
-    // Assert escaped output
-    expect(escapedTitle).not.toContain('<b>Hi</b>');
-    expect(escapedBody).not.toContain('<script>');
-    expect(escapedTitle).toContain('&lt;b&gt;');
-    expect(escapedBody).toContain('&lt;script&gt;');
-    expect(escapedBody).toContain('&amp;');
-    
-    logger.info = originalInfo;
-    config.mail.provider = originalProvider;
+    expect(html).toBeTruthy();
+    expect(html.length).toBeGreaterThan(50);
+    expect(html.includes('<script>')).toBe(false);
+    expect(html.includes('<b>Hi</b>')).toBe(false);
+    expect(html.includes('&lt;script&gt;')).toBe(true);
+    expect(html.includes('&lt;b&gt;Hi&lt;/b&gt;')).toBe(true);
+    expect(text.includes('<script>alert(1)</script>')).toBe(true);
   });
+
 
   test('plain text preserves original', () => {
     const input = '<script>alert(1)</script> & \'quotes\'';

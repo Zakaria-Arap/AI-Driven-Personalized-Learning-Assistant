@@ -33,19 +33,7 @@ exports.sendCode = async ({ to, code, name }) => {
 };
 
 exports.sendAnnouncement = async ({ to, name, title, body, senderName, schoolName, link }) => {
-  const escapedTitle = escapeHtml(title);
-  const escapedBody = escapeHtml(body);
-  const escapedSender = escapeHtml(senderName);
-  const escapedSchool = escapeHtml(schoolName);
-  
-  const subject = `[${schoolName}] ${title}`;
-  const text = `${title}\n\nFrom: ${senderName}\n\n${body}\n\nView: ${link}`;
-  const html = `
-    <h2>${escapedTitle}</h2>
-    <p><strong>From:</strong> ${escapedSender}</p>
-    <p>${escapedBody.replace(/\n/g, '<br>')}</p>
-    <p><a href="${link}">View announcement</a></p>
-  `;
+  const { subject, text, html } = exports._buildAnnouncementEmail({ title, body, senderName, schoolName, link });
 
   if (config.mail.provider === 'log') {
     logger.info(`[MAIL] announcement to ${name} <${to}>: ${subject}`);
@@ -61,4 +49,21 @@ exports.sendAnnouncement = async ({ to, name, title, body, senderName, schoolNam
       html,
     });
   }
+};
+
+exports._buildAnnouncementEmail = ({ title, body, senderName, schoolName, link }) => {
+  const escapedTitle = escapeHtml(title);
+  const escapedBody = escapeHtml(body);
+  const escapedSender = escapeHtml(senderName);
+  
+  const subject = `[${schoolName}] ${title}`;
+  const text = `${title}\n\nFrom: ${senderName}\n\n${body}\n\nView: ${link}`;
+  const html = `
+    <h2>${escapedTitle}</h2>
+    <p><strong>From:</strong> ${escapedSender}</p>
+    <p>${escapedBody.replace(/\n/g, '<br>')}</p>
+    <p><a href="${link}">View announcement</a></p>
+  `;
+
+  return { subject, text, html };
 };
