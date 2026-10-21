@@ -26,6 +26,7 @@ const escapeHtml = (str) => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 };
+exports._escapeHtml = escapeHtml;
 
 exports.sendCode = async ({ to, code, name }) => {
   logger.info(`[DEV MAIL] reset code for ${name} <${to}>: ${code}`);

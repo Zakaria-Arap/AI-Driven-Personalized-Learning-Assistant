@@ -17,6 +17,10 @@ exports.selectEmailRecipients = ({ audience, authorId, users }) => {
     .filter(u => targetRoles.includes(u.role))
     .filter(u => u.status === 'active')
     .filter(u => u.email && u.email.includes('@'))
+    .filter(u => {
+      const pref = u.prefs?.notify?.announcementEmail;
+      return pref !== false; // default true if undefined
+    })
     .reduce((acc, u) => {
       if (!acc.some(x => x.email === u.email)) {
         acc.push(u);

@@ -1,4 +1,4 @@
-const { selectEmailRecipients } = require('../../src/services/emailRecipients');
+const { selectEmailRecipients } = require('../../src/services/engagement/emailRecipients');
 
 describe('selectEmailRecipients', () => {
   const users = [
