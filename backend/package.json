@@ -26,6 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.11.0",
+    "nodemailer": "^10.1.7",
     "sequelize": "^6.37.3",
     "zod": "^3.23.8"
   },
@@ -35,5 +36,10 @@
     "sequelize-cli": "^6.6.2",
     "supertest": "^7.0.0"
   },
-  "jest": { "testEnvironment": "node", "testMatch": ["**/tests/**/*.test.js"] }
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
 }
