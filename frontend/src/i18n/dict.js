@@ -10,6 +10,8 @@ export const dict = {
     'greet.morning': 'Good morning', 'greet.afternoon': 'Good afternoon', 'greet.evening': 'Good evening',
     'learner.streak': 'Day streak', 'learner.xp': 'XP', 'learner.level': 'Level', 'learner.goal': "Today's goal", 'learner.next': 'Your next step', 'learner.practise': 'Practise now',
     'notif.title': 'Notifications', 'notif.none': 'You are all caught up.', 'notif.markall': 'Mark all read',
+    notifyAnnouncements: 'School announcements', notifyAssignments: 'New tasks from my teacher', notifyBadges: 'Badges and streak news',
+    notifyAnnouncementEmail: 'Email me school announcements',
     'profile.title': 'My profile', 'footer.rights': 'All rights reserved.',
   },
   sw: {
@@ -22,6 +24,8 @@ export const dict = {
     'greet.morning': 'Habari za asubuhi', 'greet.afternoon': 'Habari za mchana', 'greet.evening': 'Habari za jioni',
     'learner.streak': 'Siku mfululizo', 'learner.xp': 'Alama', 'learner.level': 'Kiwango', 'learner.goal': 'Lengo la leo', 'learner.next': 'Hatua yako inayofuata', 'learner.practise': 'Fanya mazoezi',
     'notif.title': 'Arifa', 'notif.none': 'Hakuna jipya.', 'notif.markall': 'Weka zote zimesomwa',
+    notifyAnnouncements: 'Matangazo ya shule', notifyAssignments: 'Kazi mpya kutoka kwa mwalimu wangu', notifyBadges: 'Vibali na taarifa za mfululizo',
+    notifyAnnouncementEmail: 'Nitumie matangazo ya shule kwa barua pepe',
     'profile.title': 'Wasifu wangu', 'footer.rights': 'Haki zote zimehifadhiwa.',
   },
 };

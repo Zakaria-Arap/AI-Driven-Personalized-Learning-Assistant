@@ -19,7 +19,7 @@ exports.cleanPrefs = (current, patch = {}) => {
   if (patch.reducedMotion !== undefined) out.reducedMotion = !!patch.reducedMotion;
   if (patch.density !== undefined) { if (!['comfortable', 'compact'].includes(patch.density)) throw badRequest('Invalid density'); out.density = patch.density; }
   if (patch.dailyGoal !== undefined) out.dailyGoal = clamp(Math.round(Number.isFinite(Number(patch.dailyGoal)) ? Number(patch.dailyGoal) : 5), 1, 50);
-  if (patch.notify) for (const k of ['announcements', 'assignments', 'badges']) if (patch.notify[k] !== undefined) out.notify[k] = !!patch.notify[k];
+  if (patch.notify) for (const k of ['announcements', 'assignments', 'badges', 'announcementEmail']) if (patch.notify[k] !== undefined) out.notify[k] = !!patch.notify[k];
   return out;
 };
 
