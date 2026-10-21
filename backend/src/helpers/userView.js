@@ -1,5 +1,5 @@
 // Never send hashes or lock counters to the browser.
-const DEFAULT_PREFS = { theme: 'system', fontScale: 100, reducedMotion: false, density: 'comfortable', dailyGoal: 5, notify: { announcements: true, assignments: true, badges: true } };
+const DEFAULT_PREFS = { theme: 'system', fontScale: 100, reducedMotion: false, density: 'comfortable', dailyGoal: 5, notify: { announcements: true, assignments: true, badges: true, announcementEmail: true } };
 const mergePrefs = (p) => ({ ...DEFAULT_PREFS, ...(p || {}), notify: { ...DEFAULT_PREFS.notify, ...((p || {}).notify || {}) } });
 
 module.exports = (u) => ({
