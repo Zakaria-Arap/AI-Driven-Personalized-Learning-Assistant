@@ -2,79 +2,91 @@ const ai = require('../../config/ai');
 const adaptiveLadder = require('./adaptiveLadder');
 
 // Offline provider so the whole app can be demoed and tested with no key and no cost.
-// This version builds question-specific hints by analyzing the prompt and solution.
+// This version builds question-specific hints WITHOUT revealing the answer before the final level.
 async function mockComplete({ level, maxLevel, question, topicTitle, masteryBand, latestAttempt, lang }) {
   const prompt = question.prompt || '';
   const sol = (question.solution || '').split('\n').filter(Boolean);
   const isKiswahili = lang === 'sw';
+  const answer = String(question.answer || '').trim();
   
-  // Extract numbers from the question
-  const numbers = prompt.match(/\d+(?:\.\d+)?/g) || [];
+  // Extract numbers from the question (exclude the answer to prevent leaks)
+  const allNumbers = prompt.match(/\d+(?:\.\d+)?/g) || [];
+  const safeNumbers = allNumbers.filter(n => n !== answer && !answer.includes(n));
   
-  // Extract key terms (simple: words longer than 4 chars, capitalized or after certain words)
+  // Extract key term
   const keyTermMatch = prompt.match(/(?:find|calculate|determine|solve for|what is)\s+(?:the\s+)?(\w+(?:\s+\w+)?)/i);
-  const keyTerm = keyTermMatch ? keyTermMatch[1] : 'the answer';
+  const keyTerm = keyTermMatch ? keyTermMatch[1] : 'the value';
   
-  // Get concept hint from topic title (extract main concept word)
-  const conceptWords = (topicTitle || '').split(/\s+/).filter(w => w.length > 4 && w[0] === w[0].toUpperCase());
-  const concept = conceptWords[0] || 'the concept';
+  // Get concept from topic title
+  const conceptWords = (topicTitle || '').split(/\s+/).filter(w => w.length > 4);
+  const concept = conceptWords[0] || 'this';
   
-  // Build contextual hints
+  // Build safe hints
   switch (level) {
     case 1:
-      if (isKiswahili) return `Swali linauliza nini? Andika unachojua na unachotaka kupata.${numbers.length ? ` Una namba: ${numbers.join(', ')}.` : ''}`;
-      return `What is the question asking you to find${keyTerm !== 'the answer' ? ` about ${keyTerm}` : ''}? Write down what you know${numbers.length ? ` (you have: ${numbers.slice(0, 3).join(', ')}${numbers.length > 3 ? '...' : ''})` : ''} and what you need.`;
+      if (isKiswahili) return `Swali linauliza nini? Andika unachojua na unachotaka kupata.`;
+      return `What is the question asking you to find? Write down what you know from the problem and what you need to find.`;
       
     case 2:
       if (isKiswahili) return `Fikiria sheria au fomula inayohusiana na ${concept}. Inasema nini kwa ujumla?`;
-      return `Think about the ${concept} concept. Which rule or formula connects ${numbers.length >= 2 ? 'these quantities' : 'the values in this problem'}? Write it in general form first.`;
+      return `Think about the ${concept} concept. Which rule or formula applies to this type of problem? Write the general formula first.`;
       
     case 3:
+      // Only use solution line if it does NOT contain the answer (check both text and numeric equivalents)
       if (sol.length > 0) {
-        const firstStep = sol[0];
-        if (isKiswahili) return `Hatua ya kwanza: ${firstStep.slice(0, 60)}... Jaribu kuendelea.`;
-        return `Start with: ${firstStep.slice(0, 80)}${firstStep.length > 80 ? '...' : ''}. What comes next?`;
+        const firstLine = sol[0];
+        const answerLower = answer.toLowerCase();
+        const lineLower = firstLine.toLowerCase();
+        
+        // Text match
+        let containsAnswer = lineLower.includes(answerLower);
+        
+        // Check numeric equivalents (e.g., 0.5 vs 1/2)
+        if (!containsAnswer && question.type === 'numeric') {
+          const { toNumber } = require('../assessment/marking');
+          const answerNum = toNumber(answer);
+          if (!Number.isNaN(answerNum)) {
+            // Extract all fractions and decimals from the line
+            const possibleNums = firstLine.match(/\d+(?:\.\d+)?(?:\s*\/\s*\d+)?/g) || [];
+            containsAnswer = possibleNums.some(n => Math.abs(toNumber(n) - answerNum) < 0.001);
+          }
+        }
+        
+        if (!containsAnswer) {
+          if (isKiswahili) return `Hatua ya kwanza: ${firstLine.slice(0, 70)}... Jaribu kuendelea.`;
+          return `The first step is: ${firstLine.slice(0, 90)}${firstLine.length > 90 ? '...' : ''}. What comes next?`;
+        }
       }
       if (isKiswahili) return 'Andika fomula unayohitaji, kisha weka namba kutoka kwa swali kwa hatua ya kwanza tu.';
-      return `Write the formula you need, then substitute${numbers.length ? ` the values (like ${numbers[0]})` : ' the numbers from the question'} for the first step only. What do you get?`;
+      return `Write down the formula, then substitute the values from the question for the first step. Show me that calculation.`;
       
     case 4: {
-      // Generate a similar example with different numbers
-      const modifiedNumbers = numbers.map(n => {
-        const num = parseFloat(n);
-        return !Number.isNaN(num) ? Math.round(num * 0.8) : n; // Scale down by 20%
-      });
-      
-      if (sol.length > 1) {
-        // Use the solution structure
-        const exampleSol = sol.slice(0, Math.min(3, sol.length)).map((line, i) => {
-          let modified = line;
-          numbers.forEach((orig, j) => {
-            if (modifiedNumbers[j]) {
-              modified = modified.replace(new RegExp(orig, 'g'), modifiedNumbers[j]);
-            }
-          });
-          return modified;
-        }).join('. ');
+      // Worked example with DIFFERENT numbers - NEVER use the answer
+      if (safeNumbers.length >= 2) {
+        const ex1 = Math.round(parseFloat(safeNumbers[0]) * 0.6);
+        const ex2 = Math.round(parseFloat(safeNumbers[1]) * 0.6);
         
-        if (isKiswahili) return `Hebu mfano unaofanana: ${exampleSol} Sasa jaribu kwa namba zako.`;
-        return `Here's a similar example: ${exampleSol}. Now apply the same steps to your problem.`;
+        // Double-check: don't use these numbers if they match the answer
+        if (String(ex1) !== answer && String(ex2) !== answer && 
+            !answer.includes(String(ex1)) && !answer.includes(String(ex2))) {
+          if (isKiswahili) return `Fikiria mfano rahisi: ikiwa thamani zilikuwa ${ex1} na ${ex2}, ungetumia njia ile ile. Jaribu mfano huo, kisha tumia hatua sawa kwa tatizo lako.`;
+          return `Try a simpler version first: if the values were ${ex1} and ${ex2}, you would follow the same method. Work that example through, then apply those same steps to your actual problem.`;
+        }
       }
-      
-      if (isKiswahili) return 'Fikiria mfano rahisi zaidi unaofanya kazi sawa na swali hili. Ufanye huo kwanza, kisha tumia wazo hilo kwa namba zako.';
-      return `Think of a simpler example${concept !== 'the concept' ? ` about ${concept}` : ''} with easier numbers${modifiedNumbers.length ? ` (like ${modifiedNumbers.slice(0, 2).join(', ')})` : ''}. Work that out first, then apply the same method to your problem.`;
+      if (isKiswahili) return 'Fikiria mfano rahisi zaidi wa aina hii ya tatizo. Tatua hilo kwanza, kisha tumia njia ile ile.';
+      return `Think of a simpler example of this type of problem. Solve that one first, then apply the same approach to yours.`;
     }
       
     default:
-      // Final level
+      // Final level - NOW we can reveal the full solution
       if (level >= maxLevel && sol.length > 0) {
         if (isKiswahili) return `Suluhisho kamili:\n${sol.join('\n')}\nJe, unaweza kueleza kila hatua kwa maneno yako?`;
         return `Full solution:\n${sol.join('\n')}\n\nCan you explain each step back to me in your own words?`;
       }
       
-      // Fallback if no solution available
+      // Fallback
       if (isKiswahili) return 'Hebu tutatue hatua kwa hatua. Niambie unaposhindwa wapi.';
-      return `Let's solve it step by step${latestAttempt ? '. I can see your working' : ''}. ${masteryBand === 'learning' || masteryBand === 'not_started' ? 'Start with the concept you know.' : 'Show me your first step.'}`;
+      return `Let's work through it step by step. Where are you getting stuck?`;
   }
 }
 

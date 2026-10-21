@@ -21,6 +21,20 @@ function diagnose(question, attemptText, provider = 'mock') {
     return { verdict: 'correct', error: 'none', nudge: 'That looks right! Check your working and then submit.' };
   }
 
+  // Check for common mistakes FIRST (teacher-provided insights take priority)
+  if (question.commonMistakes && Array.isArray(question.commonMistakes)) {
+    for (const mistake of question.commonMistakes) {
+      if (mistake.answer && attempt.toLowerCase() === String(mistake.answer).toLowerCase()) {
+        return {
+          verdict: 'wrong',
+          error: mistake.reason || 'common error',
+          nudge: mistake.hint || 'Look at that step again carefully.',
+          tag: mistake.tag || 'common_mistake'
+        };
+      }
+    }
+  }
+
   // For numeric questions, try detailed numeric analysis
   if (question.type === 'numeric') {
     const userNum = toNumber(attempt);
@@ -58,20 +72,6 @@ function diagnose(question, attemptText, provider = 'mock') {
       // Reciprocal error
       if (correctNum !== 0 && Math.abs(userNum - 1/correctNum) < 0.01) {
         return { verdict: 'wrong', error: 'reciprocal', nudge: 'Check if you need to divide rather than multiply, or vice versa.', tag: 'reciprocal_error' };
-      }
-    }
-  }
-
-  // Check for common mistakes if provided
-  if (question.commonMistakes && Array.isArray(question.commonMistakes)) {
-    for (const mistake of question.commonMistakes) {
-      if (mistake.answer && attempt.toLowerCase() === String(mistake.answer).toLowerCase()) {
-        return {
-          verdict: 'wrong',
-          error: mistake.reason || 'common error',
-          nudge: mistake.hint || 'Look at that step again carefully.',
-          tag: mistake.tag || 'common_mistake'
-        };
       }
     }
   }

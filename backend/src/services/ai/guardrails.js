@@ -1,8 +1,8 @@
 // Content rules for tutor input. Matching is deliberately simple and reviewed by teachers through flagged chats.
-const DISTRESS = /\b(kill myself|suicide|want to die|hurt myself|self[- ]harm|abuse[sd]?|beat(s|ing)? me|kujiua|kujitia|ninauma|kuniumiza)\b/i;
-const OFF_TOPIC = /\b(girlfriend|boyfriend|dating|mchumba|betting|kamari|porn|ngono|hack (a|the)|cheat on (the )?exam|ujanja|kupiga chizi)\b/i;
+const DISTRESS = /\b(kill myself|suicide|want to die|hurt myself|self[- ]harm|abuse[sd]?|beat(s|ing)? me|kujiua|kujitia|ninauma|kuniumiza|nauma|ananiumiza)\b/i;
+const OFF_TOPIC = /\b(girlfriend|boyfriend|dating|mchumba|bett?(ing|[ae]d)?|kamari|porn|ngono|hack (a|the)|cheat on (the )?exam|ujanja|kupiga chizi)\b/i;
 const ANSWER_PLEA = /\b(just (give|tell) me (the )?answer|what is (the )?answer|niambie jibu|nipe jibu|ignore (your|previous) (instructions?|rules))\b/i;
-const PERSONAL_INFO = /\b(your (phone|number|email|address|where do you live)|wapi unaishi|namba yako|simu yako)\b/i;
+const PERSONAL_INFO = /\b(your (phone|number|email|address)|where do you live|wapi unaishi|wapi una|unaishi wapi|namba yako|simu yako)\b/i;
 
 exports.inspect = (text) => {
   // Wellbeing concerns - highest priority
@@ -19,16 +19,16 @@ exports.inspect = (text) => {
     return {
       flag: false,
       reason: 'personal_info',
-      reply: 'I am here to help you with your learning. Let's focus on the question.'
+      reply: 'I am here to help you with your learning. Let us focus on the question.'
     };
   }
   
   // Direct answer pleas
   if (ANSWER_PLEA.test(text)) {
-    return {
+    return{
       flag: false,
       reason: 'answer_plea',
-      reply: 'I can't just give you the answer - that wouldn't help you learn! Let's work through it together. What do you understand so far?'
+      reply: 'I cannot just give you the answer - that would not help you learn! Let us work through it together. What do you understand so far?'
     };
   }
   

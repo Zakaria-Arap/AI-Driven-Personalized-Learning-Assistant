@@ -35,5 +35,10 @@
     "sequelize-cli": "^6.6.2",
     "supertest": "^7.0.0"
   },
-  "jest": { "testEnvironment": "node", "testMatch": ["**/tests/**/*.test.js"] }
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
 }

@@ -1,6 +1,7 @@
 const ai = require('../../config/ai');
 const tutorRepo = require('../../repositories/tutorRepository');
 const curriculum = require('../../repositories/curriculumRepository');
+const adaptiveLadder = require('./adaptiveLadder');
 const hintLadder = require('./hintLadder');
 const answerGuard = require('./answerGuard');
 const guardrails = require('./guardrails');
@@ -12,6 +13,7 @@ const { startOfDay } = require('../../utils/time');
 const subjects = require('../subjects/subjectService');
 const courseRepo = require('../../repositories/courseRepository');
 const userRepo = require('../../repositories/userRepository');
+const masteryRepo = require('../../repositories/masteryRepository');
 const { notFound, forbidden, AppError } = require('../../utils/errors');
 
 exports.startSession = async (learner, questionId) => {
@@ -37,21 +39,23 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
   await tutorRepo.addMessage({ sessionId, role: 'learner', content: text });
 
   const check = guardrails.inspect(text);
-  if (check.flag) {
-    session.flagged = true;
-    session.flagReason = check.reason;
-    await tutorRepo.saveSession(session);
-    try {
-      const learner = await userRepo.findById(learnerId);
-      // The teacher of the subject being studied is told. If that subject has no teacher yet, every teacher is told (safeguarding must not go unseen).
-      const topic = await curriculum.topicById(session.topicId);
-      const course = topic && topic.Strand && topic.Strand.Subject ? await courseRepo.byCode(learner.schoolId, topic.Strand.Subject.courseCode) : null;
-      const teachers = course && course.teacherId ? [course.teacherId] : await userRepo.idsByRole(learner.schoolId, 'teacher');
-      await require('../engagement/notificationService').notifyMany(teachers, { type: 'flag', title: 'A tutor chat was flagged', body: `${learner.fullName}${course ? ` (${course.name})` : ''}: ${check.reason}`, link: '/teacher/flagged' });
-    } catch (e) { require('../../utils/logger').warn('flag notify failed', { message: e.message }); }
-    await audit.record('TUTOR_FLAGGED', { actorId: learnerId, targetType: 'tutor_session', targetId: session.id, meta: { reason: check.reason } });
+  if (check.flag || check.reason) {
+    if (check.flag) {
+      session.flagged = true;
+      session.flagReason = check.reason;
+      await tutorRepo.saveSession(session);
+      try {
+        const learner = await userRepo.findById(learnerId);
+        // The teacher of the subject being studied is told. If that subject has no teacher yet, every teacher is told (safeguarding must not go unseen).
+        const topic = await curriculum.topicById(session.topicId);
+        const course = topic && topic.Strand && topic.Strand.Subject ? await courseRepo.byCode(learner.schoolId, topic.Strand.Subject.courseCode) : null;
+        const teachers = course && course.teacherId ? [course.teacherId] : await userRepo.idsByRole(learner.schoolId, 'teacher');
+        await require('../engagement/notificationService').notifyMany(teachers, { type: 'flag', title: 'A tutor chat was flagged', body: `${learner.fullName}${course ? ` (${course.name})` : ''}: ${check.reason}`, link: '/teacher/flagged' });
+      } catch (e) { require('../../utils/logger').warn('flag notify failed', { message: e.message }); }
+      await audit.record('TUTOR_FLAGGED', { actorId: learnerId, targetType: 'tutor_session', targetId: session.id, meta: { reason: check.reason } });
+    }
     await tutorRepo.addMessage({ sessionId, role: 'tutor', content: check.reply, blocked: true });
-    return { reply: check.reply, level: session.hintLevel, flagged: true };
+    return { reply: check.reply, level: session.hintLevel, flagged: check.flag };
   }
 
   const q = await curriculum.questionById(session.questionId);
@@ -59,9 +63,69 @@ exports.sendMessage = async (learnerId, sessionId, text, { askForNextHint = true
   if (askForNextHint) session.hintLevel = hintLadder.next(session.hintLevel);
   const level = Math.max(session.hintLevel, 1);
 
-  const history = await tutorRepo.messages(sessionId);
-  const system = buildPrompt({ topicTitle: topic.title, subjectName: topic.Strand && topic.Strand.Subject ? topic.Strand.Subject.name : 'this subject', question: q, level });
-  const raw = await llm.complete({ system, history, level, question: q });
+  // Gather context for the prompt
+  const learner = await userRepo.findById(learnerId);
+  const subjectName = topic.Strand && topic.Strand.Subject ? topic.Strand.Subject.name : 'this subject';
+  
+  // Get mastery context
+  let masteryScore = 0;
+  let masteryBand = 'not_started';
+  try {
+    const mastery = await masteryRepo.find(learnerId, topic.id);
+    if (mastery) {
+      masteryScore = mastery.score || 0;
+      masteryBand = mastery.band || 'not_started';
+    }
+  } catch (e) {
+    // Mastery not available, use defaults
+  }
+
+  // Get latest attempt from this session's messages
+  const messages = await tutorRepo.messages(sessionId);
+  const learnerMessages = messages.filter(m => m.role === 'learner');
+  const latestAttempt = learnerMessages.length > 1 ? learnerMessages[learnerMessages.length - 2].content : null;
+
+  // Get prior errors - for Phase A we'll use recent attempts
+  let priorErrors = [];
+  try {
+    const { addDays } = require('../../utils/time');
+    const recentAttempts = await masteryRepo.attemptsSince(learnerId, addDays(new Date(), -30));
+    priorErrors = recentAttempts
+      .filter(a => !a.correct && a.topicId === topic.id)
+      .slice(0, 5)
+      .map(a => ({ error: 'prior mistake', response: a.response }));
+  } catch (e) {
+    // Attempts not available, continue without
+  }
+
+  const lang = learner.language || 'en';
+
+  const history = messages;
+  const system = buildPrompt({ 
+    topicTitle: topic.title, 
+    topicOutcome: topic.outcome,
+    subjectName, 
+    question: q, 
+    level,
+    maxLevel: hintLadder.MAX_LEVEL,
+    masteryScore,
+    masteryBand,
+    latestAttempt,
+    priorErrors,
+    lang
+  });
+  
+  const raw = await llm.complete({ 
+    system, 
+    history, 
+    level, 
+    maxLevel: hintLadder.MAX_LEVEL,
+    question: q,
+    topicTitle: topic.title,
+    masteryBand,
+    latestAttempt,
+    lang
+  });
 
   const guarded = answerGuard.check({ reply: raw, answer: q.answer, level, fallback: fallbackHint(level) });
   if (guarded.blocked) {
