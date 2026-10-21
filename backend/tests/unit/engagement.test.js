@@ -50,7 +50,7 @@ describe('profile preferences', () => {
   test('clamps and validates', () => {
     const p = profile.cleanPrefs({}, { fontScale: 500, dailyGoal: 0, theme: 'dark', notify: { badges: false } });
     expect(p).toMatchObject({ fontScale: 130, dailyGoal: 1, theme: 'dark' });
-    expect(p.notify).toEqual({ announcements: true, assignments: true, badges: false });
+    expect(p.notify).toEqual({ announcements: true, assignments: true, badges: false, announcementEmail: true });
     expect(() => profile.cleanPrefs({}, { theme: 'neon' })).toThrow();
   });
   test('device names', () => {
