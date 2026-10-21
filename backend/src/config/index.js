@@ -25,4 +25,14 @@ module.exports = {
     secret: env === 'production' ? required('JWT_SECRET') : required('JWT_SECRET', 'dev-secret-not-for-production'),
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
   },
+  mail: {
+    provider: process.env.MAIL_PROVIDER || 'log',
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    from: process.env.MAIL_FROM || 'noreply@somo.local',
+  },
 };
