@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
+    "db:test:setup": "cross-env NODE_ENV=test sequelize-cli db:migrate && cross-env NODE_ENV=test sequelize-cli db:seed:all",
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:undo": "sequelize-cli db:migrate:undo:all",
     "db:seed": "sequelize-cli db:seed:all",

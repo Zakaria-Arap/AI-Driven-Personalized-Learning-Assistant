@@ -7,6 +7,9 @@ const required = (name, fallback) => {
 };
 
 const env = process.env.NODE_ENV || 'development';
+const dbName = env === 'test' 
+  ? (process.env.DB_NAME_TEST || `${process.env.DB_NAME || 'somo_dev'}_test`)
+  : (process.env.DB_NAME || 'somo_dev');
 
 module.exports = {
   env,
@@ -17,7 +20,7 @@ module.exports = {
   db: {
     host: process.env.DB_HOST || '127.0.0.1',
     port: Number(process.env.DB_PORT || 3306),
-    name: process.env.DB_NAME || 'somo_dev',
+    name: dbName,
     user: process.env.DB_USER || 'somo',
     password: process.env.DB_PASSWORD || 'somopass',
   },
