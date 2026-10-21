@@ -1,30 +1,38 @@
 const request = require('supertest');
 const app = require('../../src/app');
-const { sequelize } = require('../../src/models');
-const userRepo = require('../../src/repositories/userRepository');
+const bcrypt = require('bcryptjs');
+const { sequelize, School, User } = require('../../src/models');
 
 describe('Profile preferences - announcementEmail', () => {
-  let agent, user;
+  let school, learner;
 
   beforeAll(async () => {
     await sequelize.sync({ force: true });
-    user = await userRepo.create({
-      schoolId: 1,
-      userCode: 'TEST-001',
+    school = await School.create({ name: 'Test School', code: 'TST', subdomain: 'test', timezone: 'UTC' });
+    learner = await User.create({
+      schoolId: school.id,
+      userCode: 'LRN-001',
       role: 'learner',
-      fullName: 'Test User',
-      passwordHash: 'hash',
+      fullName: 'Test Learner',
+      passwordHash: await bcrypt.hash('Test1234!', 10),
       mustChangePassword: false,
-      language: 'en'
+      language: 'en',
+      grade: 10
     });
   });
 
-  beforeEach(() => {
-    agent = request.agent(app);
+  afterAll(async () => {
+    await sequelize.close();
   });
 
   test('save announcementEmail=false and read it back', async () => {
-    agent.auth = { userId: user.id, role: user.role, schoolId: user.schoolId };
+    const agent = request.agent(app);
+    
+    const loginRes = await agent
+      .post('/auth/login')
+      .send({ userCode: learner.userCode, password: 'Test1234!' });
+    
+    expect(loginRes.status).toBe(200);
     
     const saveRes = await agent
       .patch('/profile')
