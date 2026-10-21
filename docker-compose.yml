@@ -1,0 +1,17 @@
+# Local MySQL for development. Run: docker compose up -d
+services:
+  db:
+    image: mysql:8.0
+    container_name: somo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: somo_dev
+      MYSQL_USER: somo
+      MYSQL_PASSWORD: somopass
+    ports:
+      - "3306:3306"
+    volumes:
+      - somo_data:/var/lib/mysql
+volumes:
+  somo_data:

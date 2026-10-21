@@ -1,0 +1,11 @@
+const { z } = require('zod');
+exports.topicParam = z.object({ topicId: z.coerce.number().int().positive() });
+exports.answer = z.object({ questionId: z.number().int().positive(), response: z.union([z.string().max(120), z.number()]).transform(String), hintsUsed: z.number().int().min(0).max(5).optional() });
+exports.tutorStart = z.object({ questionId: z.number().int().positive() });
+exports.tutorSend = z.object({ text: z.string().trim().min(1).max(600) });
+exports.sessionParam = z.object({ id: z.coerce.number().int().positive() });
+exports.learnerParam = z.object({ learnerId: z.coerce.number().int().positive() });
+exports.classQuery = z.object({ classLabel: z.string().trim().max(20).optional() });
+exports.subjectQuery = z.object({ subject: z.string().trim().max(10).optional() });
+exports.subjectGradeQuery = z.object({ subject: z.string().trim().max(10).optional(), grade: z.coerce.number().int().min(10).max(12).optional(), classLabel: z.string().trim().max(20).optional() });
+exports.choice = z.object({ pathway: z.enum(['stem', 'social']), courseCodes: z.array(z.string().trim().max(10)).min(1).max(3) });

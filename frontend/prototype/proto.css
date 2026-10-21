@@ -1,0 +1,9 @@
+.demobar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; display: flex; flex-direction: column; align-items: center; z-index: 90; font-family: var(--font-body, system-ui); }
+.demotoggle { background: #111; color: #fff; border: 0; border-radius: 99px; padding: .4rem .8rem; font-size: .72rem; letter-spacing: .12em; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+.demopanel { background: #111; color: #eee; border-radius: 14px; padding: .9rem 1rem; width: min(300px, 86vw); margin-bottom: .5rem; box-shadow: 0 10px 30px rgba(0,0,0,.4); font-size: .85rem; }
+.demopanel p { margin: .4rem 0; color: #bbb; } .demopanel code { color: #ffd166; }
+.demochips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.demochips button, .demopanel .reset { background: #2b2b2b; color: #fff; border: 1px solid #444; border-radius: 8px; padding: .3rem .65rem; cursor: pointer; font-size: .8rem; }
+.demochips button:hover, .demopanel .reset:hover { background: #3a3a3a; }
+.democode { background: #ffd166; color: #111; padding: .55rem .8rem; border-radius: 10px; margin-bottom: .5rem; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+.democode button { background: none; border: 0; margin-left: .5rem; cursor: pointer; font-weight: 700; }

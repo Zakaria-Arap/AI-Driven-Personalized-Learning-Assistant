@@ -1,0 +1,25 @@
+const router = require('express').Router();
+const c = require('../controllers/adminController');
+const v = require('../validators/admin.validators');
+const validate = require('../middleware/validate');
+const requireAuth = require('../middleware/requireAuth');
+const requireRole = require('../middleware/requireRole');
+
+router.use(requireAuth, requireRole('admin'));
+router.get('/users', validate({ query: v.search }), c.search);
+router.get('/users/all', validate({ query: v.listQuery }), c.list);
+router.post('/users/bulk', validate({ body: v.bulk }), c.bulk);
+router.patch('/users/:id', validate({ params: v.idParam, body: v.edit }), c.edit);
+router.get('/parent-links', c.links);
+router.patch('/parent-links/:id/consent', validate({ params: v.idParam, body: v.consent }), c.setConsent);
+router.delete('/parent-links/:id', validate({ params: v.idParam }), c.removeLink);
+router.post('/users', validate({ body: v.issue }), c.issue);
+router.patch('/users/:id/active', validate({ params: v.idParam, body: v.active }), c.setActive);
+router.post('/users/:id/reset-password', validate({ params: v.idParam }), c.resetPassword);
+router.post('/parent-links', validate({ body: v.link }), c.link);
+router.get('/courses', c.courses);
+router.patch('/courses/:id/teacher', validate({ params: v.idParam, body: v.courseTeacher }), c.setTeacher);
+router.get('/learners/:id/subjects', validate({ params: v.idParam }), c.learnerSubjects);
+router.put('/learners/:id/subjects', validate({ params: v.idParam, body: v.learnerSubjects }), c.setLearnerSubjects);
+router.get('/audit', validate({ query: v.auditQuery }), c.auditSearch);
+module.exports = router;

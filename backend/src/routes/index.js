@@ -1,0 +1,11 @@
+const router = require('express').Router();
+router.get('/health', (req, res) => res.json({ ok: true, service: 'somo-backend', time: new Date().toISOString() }));
+router.use('/auth', require('./auth.routes'));
+router.use('/admin', require('./admin.routes'));
+router.use('/learner', require('./learner.routes'));
+router.use('/tutor', require('./tutor.routes'));
+router.use('/dashboards', require('./dashboard.routes'));
+router.use('/settings', require('./settings.routes'));
+router.use('/profile', require('./profile.routes'));
+router.use('/', require('./engagement.routes'));
+module.exports = router;
