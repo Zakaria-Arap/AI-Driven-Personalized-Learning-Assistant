@@ -24,7 +24,8 @@ function containsAnswer(reply, answer) {
  * @param {number} maxLevel - Session's maximum level (from adaptiveLadder)
  */
 exports.check = ({ reply, answer, level, maxLevel, fallback }) => {
-  if (level >= maxLevel) return { ok: true, reply, blocked: false };
+  const finalLevel = maxLevel || require('./hintLadder').MAX_LEVEL;
+  if (level >= finalLevel) return { ok: true, reply, blocked: false };
   if (containsAnswer(reply, answer)) return { ok: false, reply: fallback, blocked: true };
   return { ok: true, reply, blocked: false };
 };

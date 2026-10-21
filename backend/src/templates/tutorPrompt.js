@@ -2,8 +2,14 @@
 const adaptiveLadder = require('../services/ai/adaptiveLadder');
 
 module.exports = ({ topicTitle, topicOutcome, subjectName = 'Core Mathematics', question, level, maxLevel, masteryScore, masteryBand, latestAttempt, priorErrors, lang = 'en' }) => {
-  const step = adaptiveLadder.get(level, maxLevel);
   const isKiswahili = lang === 'sw';
+  const isFinalLevel = level >= maxLevel;
+  
+  // At final level: use "give the full worked solution" step
+  // Below final: use the standard step from hintLadder
+  const step = isFinalLevel 
+    ? { level: maxLevel, name: 'Full solution', instruction: 'Give the complete worked solution step by step and explain each step. The learner should understand how to solve similar problems.' }
+    : adaptiveLadder.get(level, maxLevel);
   
   const parts = [
     isKiswahili 
@@ -51,9 +57,7 @@ module.exports = ({ topicTitle, topicOutcome, subjectName = 'Core Mathematics', 
   
   // CRITICAL SAFETY: Answer and solution enter the prompt ONLY at the final level of THIS session
   // Final level means level === maxLevel (the adaptive ladder's chosen max for this learner)
-  // Below the final level, the prompt contains NO answer or solution (answerGuard is the safety net)
   if (level >= maxLevel) {
-    // At the session's final level (2, 3, 4, or 5), reveal the full solution and answer
     if (question.solution) {
       parts.push(`Teacher-reviewed solution you may now explain:\n${question.solution}`);
       parts.push(`The correct answer is: ${question.answer}`);
