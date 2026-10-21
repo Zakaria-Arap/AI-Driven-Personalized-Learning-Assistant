@@ -3,7 +3,7 @@ import catalogue from '../../../backend/src/seeders/data/courses/index.js';
 import { applyAnswer } from '../../../backend/src/services/recommendation/masteryEngine.js';
 
 export const SCHOOL_ID = 1;
-export const DEFAULT_PREFS = { theme: 'system', fontScale: 100, reducedMotion: false, density: 'comfortable', dailyGoal: 5, notify: { announcements: true, assignments: true, badges: true } };
+export const DEFAULT_PREFS = { theme: 'system', fontScale: 100, reducedMotion: false, density: 'comfortable', dailyGoal: 5, notify: { announcements: true, assignments: true, badges: true, announcementEmail: true } };
 const DAY = 86400000;
 
 export const PATHWAYS = { stem: 'STEM', social: 'Social Sciences' };

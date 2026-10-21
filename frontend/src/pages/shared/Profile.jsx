@@ -67,7 +67,7 @@ function Prefs() {
         <div><div className="small muted">Language</div><Seg label="Language" value={user.language} onChange={(v) => save(null, { language: v })} options={[['en', 'English'], ['sw', 'Kiswahili']]} /></div>
       </section>
       <section className="card stack"><h3>Notifications</h3>
-        {[['announcements', 'School announcements'], ['assignments', 'New tasks from my teacher'], ['badges', 'Badges and streak news']].map(([k, l]) => <label key={k} className="switch"><input type="checkbox" checked={p.notify[k]} onChange={(e) => save({ notify: { [k]: e.target.checked } })} />{l}</label>)}
+        {[['announcements', 'School announcements'], ['assignments', 'New tasks from my teacher'], ['badges', 'Badges and streak news'], ['announcementEmail', 'Email me school announcements']].map(([k, l]) => <label key={k} className="switch"><input type="checkbox" checked={p.notify[k] ?? true} onChange={(e) => save({ notify: { [k]: e.target.checked } })} />{l}</label>)}
         {user.role === 'learner' && <><h3 style={{ marginTop: '.8rem' }}>Daily goal</h3><div className="row"><input type="range" min="1" max="20" value={p.dailyGoal} onChange={(e) => setUser((u) => ({ ...u, prefs: { ...u.prefs, dailyGoal: Number(e.target.value) } }))} onMouseUp={(e) => save({ dailyGoal: Number(e.target.value) })} onTouchEnd={(e) => save({ dailyGoal: Number(e.target.value) })} onKeyUp={(e) => save({ dailyGoal: Number(e.target.value) })} aria-label="Daily goal" style={{ flex: 1 }} /><b>{p.dailyGoal} questions a day</b></div></>}
       </section>
     </div>
