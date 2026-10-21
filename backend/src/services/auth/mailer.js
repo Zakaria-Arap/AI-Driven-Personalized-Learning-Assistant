@@ -6,8 +6,7 @@ let transporter = null;
 
 // Initialize nodemailer transport if SMTP configured
 if (config.mail.provider === 'smtp') {
-  const nodemailer = require('nodemailer');
-  transporter = nodemailer.createTransport({
+  transporter = require('nodemailer').createTransport({
     host: config.mail.smtp.host,
     port: config.mail.smtp.port,
     secure: config.mail.smtp.port === 465,
